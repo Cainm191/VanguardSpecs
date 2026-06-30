@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Vanguard Specs</title>
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0E0F11">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vanguard">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-theme="dark">
+
+<!-- ===== TOP BAR ===== -->
+<header class="topbar">
+  <div class="brand">
+    <img src="icons/icon-192.png" alt="" class="brand-mark">
+    <span class="brand-name">Vanguard <em>Specs</em></span>
+  </div>
+  <div class="topbar-actions">
+    <button id="syncBtn" class="icon-btn" aria-label="Sync data" title="Sync data">
+      <svg class="sync-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"></path></svg>
+    </button>
+    <button id="themeBtn" class="icon-btn" aria-label="Toggle theme" title="Toggle theme">
+      <svg id="themeIcon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+    </button>
+  </div>
+</header>
+
+<div id="syncStatus" class="sync-status" hidden></div>
+
+<!-- ===== HOME VIEW ===== -->
+<main id="view-home" class="view">
+  <div class="search-wrap">
+    <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+    <input id="searchInput" type="search" placeholder="Search by name, manufacturer, FPS…" autocomplete="off" inputmode="search">
+  </div>
+
+  <div id="filterChips" class="chip-row" role="group" aria-label="Filters"></div>
+
+  <div id="resultCount" class="result-count"></div>
+
+  <section id="productGrid" class="product-grid" aria-live="polite"></section>
+
+  <div id="emptyState" class="empty-state" hidden>
+    <p>No matches yet</p>
+    <span>Adjust the search or filters, or sync to pull the latest catalog.</span>
+  </div>
+</main>
+
+<!-- ===== PRODUCT DETAIL VIEW ===== -->
+<main id="view-detail" class="view" hidden>
+  <button class="back-btn" id="backFromDetail">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    Catalog
+  </button>
+  <div id="detailContent"></div>
+</main>
+
+<!-- ===== COMPARISON VIEW ===== -->
+<main id="view-compare" class="view" hidden>
+  <button class="back-btn" id="backFromCompare">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    Catalog
+  </button>
+  <h1 class="compare-title">Comparison</h1>
+  <div id="compareContent"></div>
+</main>
+
+<!-- ===== FULLSCREEN IMAGE VIEWER ===== -->
+<div id="lightbox" class="lightbox" hidden>
+  <button id="lightboxClose" class="lightbox-close" aria-label="Close">&times;</button>
+  <img id="lightboxImg" src="" alt="">
+</div>
+
+<!-- ===== COMPARE FLOATING BUTTON ===== -->
+<button id="compareFab" class="compare-fab" hidden>
+  <span id="compareFabCount">0</span> selected — View comparison
+</button>
+
+<script src="storage.js"></script>
+<script src="parser.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
