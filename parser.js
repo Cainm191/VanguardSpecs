@@ -11,6 +11,27 @@ const MANUFACTURER_KEYWORDS = [
   'Secutor', 'Novritsch', 'Glock', 'SIG', 'Cybergun', 'Echo1', 'Valken',
 ];
 
+// Short, ambiguous codes that double as common English words/abbreviations.
+// Only trusted as a manufacturer match when found in the (short, deliberate) title —
+// never in free-form body text, where they cause false positives (e.g. "We begin with...").
+const AMBIGUOUS_CODES = new Set(['WE', 'TM']);
+
+/**
+ * Gun-like signal patterns used to classify whether a Shopify listing is an
+ * actual airsoft gun (vs. accessories, apparel, watches, archery gear, etc.,
+ * which this particular store's feed also contains under the same vendor).
+ */
+const GUN_SIGNAL_PATTERNS = [
+  /\d{2,4}\s?\+?\s?fps/i,
+  /\d+(?:\.\d+)?\s?j(?:oules?)?\b/i,
+  /\bgbb\b|gas\s?blow\s?back/i,
+  /\baeg\b/i,
+  /\bhpa\b/i,
+  /\bgearbox\b/i,
+  /\bhop[\s-]?up\b/i,
+  /\bairsoft\s?gun\b/i,
+];
+
 const GAS_TYPES = [
   { label: 'Green Gas', test: /\bgreen\s?gas\b/i },
   { label: 'CO2', test: /\bco2\b|\bco₂\b/i },
@@ -19,15 +40,37 @@ const GAS_TYPES = [
   { label: 'Spring', test: /\bspring\b(?!\s?steel)/i },
 ];
 
-function extractManufacturer(title) {
+function extractManufacturer(title, bodyText) {
   if (!title) return 'Unknown';
+
+  // First pass: title only, all keywords allowed (titles are short and deliberate).
   for (const brand of MANUFACTURER_KEYWORDS) {
     const re = new RegExp(`\\b${brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
     if (re.test(title)) {
       return brand === 'TM' ? 'Tokyo Marui' : brand;
     }
   }
+
+  // Second pass: body text, excluding ambiguous codes that double as common words.
+  if (bodyText) {
+    for (const brand of MANUFACTURER_KEYWORDS) {
+      if (AMBIGUOUS_CODES.has(brand)) continue;
+      const re = new RegExp(`\\b${brand.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+      if (re.test(bodyText)) return brand;
+    }
+  }
+
   return 'Unknown';
+}
+
+/**
+ * Returns true if a listing shows real airsoft-gun signals (FPS, joules,
+ * GBB/AEG/HPA/gearbox/hop-up language), as opposed to accessories, apparel,
+ * watches, or archery gear that share a vendor/store with the gun catalog.
+ */
+function isAirsoftGun(text) {
+  if (!text) return false;
+  return GUN_SIGNAL_PATTERNS.some((re) => re.test(text));
 }
 
 function extractFPS(text) {
@@ -113,9 +156,7 @@ function parseProduct(raw) {
     id: raw.id,
     handle: raw.handle,
     title,
-    manufacturer: extractManufacturer(title) !== 'Unknown'
-      ? extractManufacturer(title)
-      : extractManufacturer(combined),
+    manufacturer: extractManufacturer(title, bodyText),
     category: raw.product_type || 'Uncategorized',
     type: extractType(combined),
     fps: extractFPS(combined),
@@ -131,11 +172,14 @@ function parseProduct(raw) {
     vendor: raw.vendor || null,
     tags: raw.tags || '',
     updatedAt: raw.updated_at || null,
+    isGun: isAirsoftGun(combined),
   };
 }
 
 function parseProducts(rawProducts) {
-  return (rawProducts || []).map(parseProduct);
+  return (rawProducts || [])
+    .map(parseProduct)
+    .filter((p) => p.isGun);
 }
 
 window.VSParser = {
@@ -149,5 +193,6 @@ window.VSParser = {
   extractLength,
   extractWeight,
   extractType,
+  isAirsoftGun,
   stripHTML,
 };
