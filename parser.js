@@ -9,6 +9,9 @@ const MANUFACTURER_KEYWORDS = [
   'Umarex', 'Specna Arms', 'APS', 'APS-X', 'EMG', 'Action Army', 'King Arms',
   'Maxx Model', 'Bell', 'Army Armament', 'WELL', 'Double Bell', 'JAG Arms',
   'Secutor', 'Novritsch', 'Glock', 'SIG', 'Cybergun', 'Echo1', 'Valken',
+  // Added from Unlimited Airsoft Shop's own brand/category navigation:
+  'SRC', 'A&K', 'GHK', 'LCT', 'NorthEast', 'AceTech', 'KJ Works', 'WinGun',
+  'WG', 'KWC', 'Bolt Airsoft',
 ];
 
 // Short, ambiguous codes that double as common English words/abbreviations.
@@ -16,27 +19,41 @@ const MANUFACTURER_KEYWORDS = [
 // never in free-form body text, where they cause false positives (e.g. "We begin with...").
 const AMBIGUOUS_CODES = new Set(['WE', 'TM']);
 
-/**
- * Gun-like signal patterns used to classify whether a Shopify listing is an
- * actual airsoft gun (vs. accessories, apparel, watches, archery gear, etc.,
- * which this particular store's feed also contains under the same vendor).
- */
-const GUN_SIGNAL_PATTERNS = [
-  /\d{2,4}\s?\+?\s?fps/i,
-  /\d+(?:\.\d+)?\s?j(?:oules?)?\b/i,
-  /\bgbb\b|gas\s?blow\s?back/i,
-  /\baeg\b/i,
-  /\bhpa\b/i,
-  /\bgearbox\b/i,
-  /\bhop[\s-]?up\b/i,
-  /\bairsoft\s?gun\b/i,
+// Vendors in this feed that are never airsoft guns (watches, apparel, footwear, etc.)
+// — used to exclude clearly-unrelated stock that shares the same Shopify catalog.
+const EXCLUDED_VENDORS = new Set([
+  'casio / g shock', 'casio', 'g-shock', 'g shock', 'swanndri', 'hi-tec', 'hitec',
+]);
+
+// Title/description phrases that flag an item as a non-gun accessory, archery
+// product, apparel, or general store item rather than an airsoft gun itself.
+const EXCLUDE_PATTERNS = [
+  /\bbow\b|\barchery\b|\barrow(s)?\b/i,
+  /\bcleaning\s?rod\b/i,
+  /\bkill\s?rag\b/i,
+  /\brepair\s?mat\b/i,
+  /\bback\s?pack\b|\bbackpack\b/i,
+  /\bplate\s?carrier\b/i,
+  /\bbushshirt\b|\bwool\b|\bzip\sfront\b/i,
+  /\bhiking\s?boot\b|\bwaterproof\s?shoe\b/i,
+  /\bwristwatch\b|\bstopwatch\b|\bwater\s?resistance\b/i,
+];
+
+// Checked against the TITLE only (not body text), since these are standalone
+// accessory product titles in the store's own nav (Battery & Charger / GBB
+// & AEG Magazine / Gas & Lube) — checking body text would wrongly exclude
+// real guns, whose descriptions almost always mention battery/magazine use.
+const EXCLUDE_TITLE_PATTERNS = [
+  /\bmagazine\b/i,
+  /\bbattery\b|\bcharger\b/i,
+  /\bgas\s?&\s?lube\b|\bsilicone\s?lube\b|\blube\b/i,
 ];
 
 const GAS_TYPES = [
   { label: 'Green Gas', test: /\bgreen\s?gas\b/i },
   { label: 'CO2', test: /\bco2\b|\bco₂\b/i },
   { label: 'HPA', test: /\bhpa\b|\bhigh\s?pressure\s?air\b/i },
-  { label: 'Electric / AEG', test: /\baeg\b|\belectric\b/i },
+  { label: 'Electric / AEG', test: /\baeg\w*\b|\belectric\b/i },
   { label: 'Spring', test: /\bspring\b(?!\s?steel)/i },
 ];
 
@@ -64,13 +81,25 @@ function extractManufacturer(title, bodyText) {
 }
 
 /**
- * Returns true if a listing shows real airsoft-gun signals (FPS, joules,
- * GBB/AEG/HPA/gearbox/hop-up language), as opposed to accessories, apparel,
- * watches, or archery gear that share a vendor/store with the gun catalog.
+ * Returns true if a listing should be treated as an airsoft gun.
+ *
+ * This feed has no reliable product_type/category field (it's blank on
+ * almost everything) and vendor is inconsistent, so rather than requiring
+ * proof a listing IS a gun (which misses plain-title guns with no spec
+ * text, e.g. "VFC M4 GBBR"), this excludes listings that are clearly NOT
+ * guns (watches, apparel, footwear, archery gear, cleaning accessories)
+ * and includes everything else by default.
  */
-function isAirsoftGun(text) {
-  if (!text) return false;
-  return GUN_SIGNAL_PATTERNS.some((re) => re.test(text));
+function isAirsoftGun(title, vendor, text) {
+  const v = (vendor || '').trim().toLowerCase();
+  if (EXCLUDED_VENDORS.has(v)) return false;
+
+  if (EXCLUDE_TITLE_PATTERNS.some((re) => re.test(title || ''))) return false;
+
+  const hay = `${title || ''} ${text || ''}`;
+  if (EXCLUDE_PATTERNS.some((re) => re.test(hay))) return false;
+
+  return true;
 }
 
 function extractFPS(text) {
@@ -121,8 +150,8 @@ function extractWeight(text) {
 
 function extractType(text) {
   if (!text) return 'Unknown';
-  if (/\bgbb\b|gas\s?blow\s?back/i.test(text)) return 'GBB';
-  if (/\baeg\b/i.test(text)) return 'AEG';
+  if (/\bgbb\w*\b|gas\s?blow\s?back/i.test(text)) return 'GBB';
+  if (/\baeg\w*\b/i.test(text)) return 'AEG';
   if (/\bhpa\b/i.test(text)) return 'HPA';
   if (/\bgas\b/i.test(text)) return 'GBB';
   if (/\bspring\b/i.test(text)) return 'Spring';
@@ -172,7 +201,7 @@ function parseProduct(raw) {
     vendor: raw.vendor || null,
     tags: raw.tags || '',
     updatedAt: raw.updated_at || null,
-    isGun: isAirsoftGun(combined),
+    isGun: isAirsoftGun(title, raw.vendor, bodyText),
   };
 }
 
